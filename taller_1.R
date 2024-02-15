@@ -1,4 +1,3 @@
-
 ##punto1
 #1.1
 set.seed(145)
@@ -49,11 +48,11 @@ print(lista_concatenada)
 #1.5
 
 
-promedio_y_desviacion <- function(valores) {
+promedio_y_desviacion <- function(lista) {
   
-  promedio <- mean(valores)
+  promedio <- mean(lista)
   
-  desviacion_estandar <- sd(valores)
+  desviacion_estandar <- sd(lista)
   
   h = (list(promedio = promedio, desviacion_estandar = desviacion_estandar))
   return=h 
@@ -67,11 +66,11 @@ unlist(lista_2)
 #1.6 
 #estandarizar = (xi-media)/(sd)
 
-estandarizacion <- function(valores){
+estandarizacion <- function(lista){
   m <- promedio_sd[[1]]
   v <- promedio_sd[[2]]
   
-  datos_normalizados <- (valores - m) / v
+  datos_normalizados <- (lista - m) / v
   
 }
 std <- estandarizacion(lista_2.2[[1]])
@@ -86,37 +85,39 @@ indice_salud <- rnorm(50, mean = 0, sd = 1)
 experiencia_laboral <- rnorm(50, mean = 0, sd = 1)
 
 
-outcomes_nominales <- list(salario, indice_salud, experiencia_laboral)
+outcomes_nominales <- list("salario" = salario, "indice_salud" = indice_salud, "experiencia_laboral" = experiencia_laboral)
 
 # Mostrar la lista de listas generada
 print(outcomes_nominales)
 
 #1.8
 
-lista_a_matriz <- function(lista) {
+lista_b_matriz <- function(lista){
+
+n = length(lista)
+
+matriz_1 <- matrix(nrow = n, ncol = 2)
+
+matriz_1[,1] <- 1
+
+matriz_1[,2] <- unlist(lista)
+
+return(matriz_1)
   
-  num_elementos <- length(lista)
-  
-  
-  max_longitud <- max(sapply(lista, length))
-  
-  
-  matriz <- matrix(1, nrow = max_longitud, ncol = num_elementos + 1)
-  
-  
-  for (i in 1:num_elementos) {
-    matriz[1:length(lista[[i]]), i] <- lista[[i]]
-  }
-  
-  
-  return(matriz)
 }
+
+
+
 
 #1.9
 
-edad_std <- list(std)
-matriz_x <- lista_a_matriz(edad_std)
+edad_std <- as.list(std)
+matriz_x <- lista_b_matriz(edad_std)
+matriz_prueba <- matriz_x[,1]
+matriz_prueba2 <- matriz_x[,2]
+
 print(matriz_x)
+
 
 
 
@@ -141,46 +142,90 @@ calcular_MCO <- function(X, y) {
 
 lista_prueba <- unlist(lista_1)
 
-k <- calcular_MCO(matriz_x, lista_prueba)
+calcular_MCO(matriz_x, lista_prueba)
+
+
+modelo <- lm(lista_prueba ~ matriz_x)
 
 #### Punto 2.2 
- 
-resultados <- matrix(NA, nrow = 3, ncol = 3)
 
-for (i in outcomes_nominales){
-  valores <- calcular_MCO(unlist(outcomes_nominales[[i]]))
+matriz_MCO <- matrix(nrow = 3, ncol = 3)
+nombres <- c('salario', 'salud_index', 'experiencia')
+
+for (i in 1:length(outcomes_nominales)) {
   
-  resultados[i, 1] <- names(outcomes_nominales)[i]
+  estimadores = calcular_MCO(lista_prueba, lista_b_matriz(outcomes_nominales[[i]]))
+
   
-  resultados[i, 2] <- valores[[1]]
+  # La primera tiene el nombre del outcome
+  matriz_MCO[i, 1] <- nombres[i]
   
-  resultados[i, 3] <- valores[[2]]
+  # La segunda columna tiene el beta_hat
+  matriz_MCO[i, 2] <- estimadores$estimador[1,1]
+  
+  # La tercera columna tiene el sigma
+  matriz_MCO[i, 3] <- estimadores$error_estandar[1]
   
 }
-  
-unlist(outcomes_nominales[[1]])
 
-### punto 2.3
+print(matriz_MCO)
 
-for (i in 1:nrow(resultados)) {
-  
-  print(resultados[i, 1])
-  
-  cat("Coeficiente estimado (??1):", resultados[i, 2], "\n")
-  
-  cat("Error estándar (?? ??):", resultados[i, 3], "\n")
-  
-  cat("Interpretación económica:\n")
-  
-  cat("Un incremento unitario en", resultados[i, 1], "se asocia con un cambio de", resultados[i, 2], "en la variable de respuesta, con un error estándar de", resultados[i, 3], "\n\n")
+
+#### 2.3 
+
+for (i in 1:nrow(matriz_MCO)) {
+
+  P1 = sprintf('cuando %s aumente en una unidad', matriz_MCO[i,1])
+  P2 = sprintf(' lista1.2 %s, en promedio', matriz_MCO[i,2])
+  print(paste(P1, P2))
 }
 
-###2.4
+
+### 2.4
+
+calcular_MSE <- function(y, xi, beta0, beta1) {
+  n <- length(y)
+  y_pred <- beta0 + beta1 * xi
+  mse <- sum((y - y_pred)^2) / n
+  return(mse)
+}
+
+calcular_MSE(unlist(lista_1), unlist(edad_std), 0, 2)
 
 
+encontrar_beta_minimo <- function(y, xi, beta0, beta1_inicial, factor_aumento) {
+  mse_actual <- calcular_MSE(y, xi, beta0, beta1_inicial) 
+  beta1_actual <- beta1_inicial
+  
+  while(TRUE) {
+    beta1_siguiente <- beta1_actual + factor_aumento 
+    mse_siguiente <- calcular_MSE(y, xi, beta0, beta1_siguiente)  
+    
+    if (mse_siguiente < mse_actual) {
+      mse_actual <- mse_siguiente
+      beta1_actual <- beta1_siguiente
+    } else {
+      break 
+    }
+  }
+  
+  return(beta1_actual)
+}
+
+### 2.6
+
+beta0 <- 0
+beta1_inicial <- -2
+factor_aumento <- 0.1
+
+resultados <- matrix(NA, nrow = length(outcomes_nominales), ncol = 2,
+                     dimnames = list(NULL, c("Nombre del outcome", "Beta_min_1")))
+
+for (i in seq_along(outcomes_nominales)) {
+  outcome <- outcomes_nominales[[i]]
+  beta1_minimo <- encontrar_beta_minimo(outcomes_nominales[[i]], unlist(edad_std), beta0, beta1_inicial, factor_aumento)
+  resultados[i, ] <- c(names(outcomes_nominales)[i], beta1_minimo)
+}
 
 
-
-
-
-
+print(resultados)
